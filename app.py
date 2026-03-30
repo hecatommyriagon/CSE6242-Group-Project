@@ -1,10 +1,22 @@
+import logging
+
 from flask import Flask, render_template
+from src.frontend_utils import get_data
+
+logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 
 @app.route("/")
 def home():
+    logging.info(f"home()")
     return render_template("index.html")
+
+@app.route("/map")
+def map_page():
+    logging.info("map_page()")
+    data = get_data()
+    return render_template("map.html", data = data)
 
 if __name__ == "__main__":
     app.run(debug=True)
