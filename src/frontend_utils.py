@@ -1,11 +1,33 @@
 import json
 import time
+import os
 import logging
 
 from geopy.geocoders import Nominatim
 
+CACHE_FILE = "src/data/lat_lon_cache.json"
+
 def city_state_to_latlon(city: str, state: str) -> tuple:
     logging.info(f"city_state_to_latlon(city = {city}, state = {state})")
+    location = None
+
+    # if cache file exists
+    if os.path.exists(CACHE_FILE):
+
+        # open cache file and load with json lib
+        with open(CACHE_FILE, "r") as cache_file:
+            cache = json.load(cache_file)
+
+            # if cache contains query fetch from cache
+            if f"{city}, state" in cache:
+                return cache[f"{city}, state"]
+
+            else:
+                logging.info("Query not found in cache")
+
+    else:
+        logging.info("Cache file does not exist")
+
     geolocator = Nominatim(user_agent = "rent_vs_buy")
     
     location = geolocator.geocode(f"{city}, {state}")
@@ -15,6 +37,20 @@ def city_state_to_latlon(city: str, state: str) -> tuple:
 
     if location:
         return location.latitude, location.longitude
+    
+    # read in cache if exists
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, "r") as cache_file:
+            old_cache = json.load(cache_file)
+
+    else: 
+        old_cache = {}
+
+    # update cache
+    old_cache[f"{city}, {state}"] = location
+
+    with open(CACHE_FILE, "w") as cache_file:
+        json.dump(old_cache, cache_file, indent = 4)
     
     return None, None
 
