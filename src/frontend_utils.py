@@ -19,8 +19,9 @@ def city_state_to_latlon(city: str, state: str) -> tuple:
             cache = json.load(cache_file)
 
             # if cache contains query fetch from cache
-            if f"{city}, state" in cache:
-                return cache[f"{city}, state"]
+            if f"{city}, {state}" in cache:
+                logging.info("Query found in cache!")
+                return cache[f"{city}, {state}"]
 
             else:
                 logging.info("Query not found in cache")
@@ -34,9 +35,6 @@ def city_state_to_latlon(city: str, state: str) -> tuple:
 
     # sleep due to rate limited api
     time.sleep(1)
-
-    if location:
-        return location.latitude, location.longitude
     
     # read in cache if exists
     if os.path.exists(CACHE_FILE):
@@ -44,13 +42,18 @@ def city_state_to_latlon(city: str, state: str) -> tuple:
             old_cache = json.load(cache_file)
 
     else: 
+        logging.info("Will try to create new cache file")
         old_cache = {}
 
     # update cache
-    old_cache[f"{city}, {state}"] = location
+    old_cache[f"{city}, {state}"] = location.latitude, location.longitude
 
     with open(CACHE_FILE, "w") as cache_file:
+        logging.info("Cache file updated with new entry")
         json.dump(old_cache, cache_file, indent = 4)
+
+    if location:
+        return location.latitude, location.longitude
     
     return None, None
 

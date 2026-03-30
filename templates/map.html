@@ -43,7 +43,7 @@
         data.renters.forEach(d => {
             if (d.latitude && d.longitude) {
                 const popupContent = `
-                    <b>Renter</b><br>
+                    <b>Renting</b><br>
                     ${d.city}, ${d.state}<br><br>
                     ${formatCostTimeline(d.cost)}
                 `;
@@ -62,7 +62,7 @@
         data.buyers.forEach(d => {
             if (d.latitude && d.longitude) {
                 const popupContent = `
-                    <b>Buyer</b><br>
+                    <b>Buying</b><br>
                     ${d.city}, ${d.state}<br><br>
                     ${formatCostTimeline(d.cost)}
                 `;
