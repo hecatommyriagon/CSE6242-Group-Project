@@ -209,3 +209,7 @@ __marimo__/
 # Datasets
 src/data/*
 !src/data/readme.md
+resources/.DS_Store
+
+resources/properties_2016.csv
+data/processed/properties_2016_cleaned.csv
