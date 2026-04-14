@@ -1,11 +1,12 @@
 import logging
-
 from flask import Flask, render_template
 from src.frontend_utils import get_data
+from src.zori_api import zori_api
 
 logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
+app.register_blueprint(zori_api)
 
 @app.route("/")
 def home():
