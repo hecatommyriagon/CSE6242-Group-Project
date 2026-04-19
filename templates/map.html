@@ -38,6 +38,18 @@
             return html;
         }
 
+        function formatStatistics(statsDict) {
+            if (!statsDict) return "";
+
+            let html = "<br><b>Statistics:</b><br>";
+
+            Object.keys(statsDict).forEach(key => {
+                html += `<b>${key}</b> ${statsDict[key]}<br>`;
+            });
+
+            return html;
+        }
+
         const data = {{ data | tojson }};
 
         data.renters.forEach(d => {
@@ -46,10 +58,12 @@
                     <b>Renting</b><br>
                     ${d.city}, ${d.state}<br><br>
                     ${formatCostTimeline(d.cost)}
+                    ${formatStatistics(d.statistics)}
                 `;
 
                 L.circleMarker([d.latitude, d.longitude], {
-                    color: "blue"
+                    color: "blue",
+                    radius: 4
                 })
                 .addTo(map)
                 .bindPopup(popupContent);
@@ -65,10 +79,12 @@
                     <b>Buying</b><br>
                     ${d.city}, ${d.state}<br><br>
                     ${formatCostTimeline(d.cost)}
+                    ${formatStatistics(d.statistics)}
                 `;
 
                 L.circleMarker([d.latitude, d.longitude], {
-                    color: "red"
+                    color: "red",
+                    radius: 4
                 })
                 .addTo(map)
                 .bindPopup(popupContent);

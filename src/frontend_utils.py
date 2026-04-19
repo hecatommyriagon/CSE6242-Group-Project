@@ -4,8 +4,10 @@ import os
 import logging
 
 from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut, GeocoderServiceError, GeocoderUnavailable
 
 CACHE_FILE = "src/data/lat_lon_cache.json"
+MAX_TRIES_GEOCODING = 2
 
 def city_state_to_latlon(city: str, state: str) -> tuple:
     logging.info(f"city_state_to_latlon(city = {city}, state = {state})")
@@ -21,6 +23,10 @@ def city_state_to_latlon(city: str, state: str) -> tuple:
             # if cache contains query fetch from cache
             if f"{city}, {state}" in cache:
                 logging.info("Query found in cache!")
+
+                if cache[f"{city}, {state}"] == "NA":
+                    return None, None
+                
                 return cache[f"{city}, {state}"]
 
             else:
@@ -31,11 +37,24 @@ def city_state_to_latlon(city: str, state: str) -> tuple:
 
     geolocator = Nominatim(user_agent = "rent_vs_buy")
     
-    location = geolocator.geocode(f"{city}, {state}")
+    # try at least 5 times 
+    for i in range(MAX_TRIES_GEOCODING):
+        try:
+            location = geolocator.geocode(f"{city}, {state}")
+            
+        except (GeocoderTimedOut, GeocoderUnavailable, GeocoderServiceError) as e:
+            logging.warning("Failed to geocode due to API failure")
 
-    # sleep due to rate limited api
-    time.sleep(1)
+            # sleep due to rate limited api
+            time.sleep(2)
+
+            if i == MAX_TRIES_GEOCODING - 1:
+                logging.warning("Giving up on geocoding")
+                location = "NA"
     
+    # sleep due to rate limited api
+    time.sleep(1.1)
+
     # read in cache if exists
     if os.path.exists(CACHE_FILE):
         with open(CACHE_FILE, "r") as cache_file:
@@ -46,18 +65,25 @@ def city_state_to_latlon(city: str, state: str) -> tuple:
         old_cache = {}
 
     # update cache
-    old_cache[f"{city}, {state}"] = location.latitude, location.longitude
+    if location == ("NA"):
+        old_cache[f"{city}, {state}"] = "NA"
+    
+    elif location is not None:
+        old_cache[f"{city}, {state}"] = location.latitude, location.longitude
 
     with open(CACHE_FILE, "w") as cache_file:
         logging.info("Cache file updated with new entry")
         json.dump(old_cache, cache_file, indent = 4)
-
-    if location:
+    
+    if location == ("NA"):
+        return None, None
+    elif location:
         return location.latitude, location.longitude
     
+    logging.warning("Geocoding failed")
     return None, None
 
-def read_json(filepath = "src/output/sample_output.json"):
+def read_json(filepath = "src/output/homelens_output.json"):
     logging.info(f"filepath = {filepath}")
 
     # open the json
