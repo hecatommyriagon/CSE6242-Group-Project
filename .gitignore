@@ -207,7 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 # Datasets
-src/data/*
+src/data/*input*
+!src/data/readme.md
 !src/data/readme.md
 resources/.DS_Store
 

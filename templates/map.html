@@ -260,48 +260,64 @@
               html += `${date}: $${costDict[date].toFixed(2)}<br>`;
           });
 
-          return html;
-      }
+            return html;
+        }
+
+        function formatStatistics(statsDict) {
+            if (!statsDict) return "";
+
+            let html = "<br><b>Statistics:</b><br>";
+
+            Object.keys(statsDict).forEach(key => {
+                html += `<b>${key}</b> ${statsDict[key]}<br>`;
+            });
+
+            return html;
+        }
 
       var data = {{ data | tojson }};
 
-      data.renters.forEach(d => {
-          if (d.latitude && d.longitude) {
-              const popupContent = `
-                  <b>Renting</b><br>
-                  ${d.city}, ${d.state}<br><br>
-                  ${formatCostTimeline(d.cost)}
-              `;
-              const marker = L.circleMarker([d.latitude, d.longitude], {
-                  color: "blue"
-              }).addTo(map);
-              marker.bindPopup(popupContent);
-              marker.on('mouseover', function() {
-                  showZoriChart(d.city);
-              });
-          } else {
-              console.log("Could not make marker for: ", d)
-          }
-      });
+        data.renters.forEach(d => {
+            if (d.latitude && d.longitude) {
+                const popupContent = `
+                    <b>Renting</b><br>
+                    ${d.city}, ${d.state}<br><br>
+                    ${formatCostTimeline(d.cost)}
+                    ${formatStatistics(d.statistics)}
+                `;
 
-      data.buyers.forEach(d => {
-          if (d.latitude && d.longitude) {
-              const popupContent = `
-                  <b>Buying</b><br>
-                  ${d.city}, ${d.state}<br><br>
-                  ${formatCostTimeline(d.cost)}
-              `;
-              const marker = L.circleMarker([d.latitude, d.longitude], {
-                  color: "red"
-              }).addTo(map);
-              marker.bindPopup(popupContent);
-              marker.on('mouseover', function() {
-                  showZoriChart(d.city);
-              });
-          } else {
-              console.log("Could not make marker for: ", d)
-          }
-      });
+                L.circleMarker([d.latitude, d.longitude], {
+                    color: "blue",
+                    radius: 4
+                })
+                .addTo(map)
+                .bindPopup(popupContent);
+            }
+            else {
+                console.log("Could not make marker for: ", d)
+            }
+        });
+
+        data.buyers.forEach(d => {
+            if (d.latitude && d.longitude) {
+                const popupContent = `
+                    <b>Buying</b><br>
+                    ${d.city}, ${d.state}<br><br>
+                    ${formatCostTimeline(d.cost)}
+                    ${formatStatistics(d.statistics)}
+                `;
+
+                L.circleMarker([d.latitude, d.longitude], {
+                    color: "red",
+                    radius: 4
+                })
+                .addTo(map)
+                .bindPopup(popupContent);
+            }
+            else {
+                console.log("Could not make marker for: ", d)
+            }
+        });
     </script>
   </body>
 </html>
