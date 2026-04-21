@@ -1,4 +1,5 @@
-DISABLE_GEOCODING = True  # Set to True to skip all geocoding for fast UI testing
+FILTER_TO_CACHED_CITIES = True
+DISABLE_GEOCODING = False
 import json
 import time
 import os
@@ -97,12 +98,44 @@ def read_json(filepath="src/output/homelens_output.json"):
     with open(filepath, "r") as file:
         data = json.load(file)
 
-        return data
+    # filter to only entries that we have lat/lon for in cache, if flag is set
+    if FILTER_TO_CACHED_CITIES:
+        if os.path.exists(CACHE_FILE):
+            with open(CACHE_FILE, "r") as cache_file:
+                cache = json.load(cache_file)
+        else:
+            cache = {}
+
+        def in_cache(datum):
+            return (
+                f"{datum.get('city')}, {datum.get('state')}" in cache
+                and cache[f"{datum.get('city')}, {datum.get('state')}"] != "NA"
+            )
+
+        data["renters"] = [d for d in data.get("renters", []) if in_cache(d)]
+        data["buyers"] = [d for d in data.get("buyers", []) if in_cache(d)]
+    return data
 
 
 def update_data(data: dict) -> dict:
     if DISABLE_GEOCODING:
         logging.info("Geocoding disabled: skipping update_data.")
+        return data
+
+    # If flag is set, only add lat/lon from cache and skip geocoding entirely for fast UI testing
+    if FILTER_TO_CACHED_CITIES:
+        if os.path.exists(CACHE_FILE):
+            with open(CACHE_FILE, "r") as cache_file:
+                cache = json.load(cache_file)
+        else:
+            cache = {}
+        for group, offset in [("renters", -0.02), ("buyers", 0.02)]:
+            for datum in data.get(group, []):
+                key = f"{datum.get('city')}, {datum.get('state')}"
+                latlon = cache.get(key)
+                if latlon and latlon != "NA":
+                    datum["latitude"] = latlon[0] + offset
+                    datum["longitude"] = latlon[1] + offset
         return data
 
     """

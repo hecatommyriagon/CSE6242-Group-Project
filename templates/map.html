@@ -159,15 +159,15 @@
                   const listDiv = document.getElementById('autocomplete-list');
                   listDiv.innerHTML = '';
                   // Only show exact 'City, ST' matches in the dropdown
-                  arr.filter(c => c.toLowerCase().includes(val.toLowerCase())).slice(0, 10).forEach(city => {
+                  arr.filter(c => c.toLowerCase().includes(val.toLowerCase())).slice(0, 10).forEach(cityState => {
                       let item = document.createElement('div');
-                      item.innerHTML = city;
+                      item.innerHTML = cityState;
                       item.style.padding = '4px';
                       item.style.cursor = 'pointer';
                       item.onclick = function() {
-                          inp.value = city;
+                          inp.value = cityState;
                           closeAllLists();
-                          showCityPopup(city, true); // Always pass full 'City, ST' and pan
+                          showCityPopup(cityState, true); // Only use showCityPopup for searchbar
                       };
                       listDiv.appendChild(item);
                   });
@@ -249,15 +249,24 @@
               }
               function formatStatValue(k, v) {
                   if (typeof v !== 'number') return v;
+                  if (/change[_ ]?percent|percent[_ ]?change|pct[_ ]?change|change[_ ]?pct/i.test(k)) {
+                      return v.toFixed(1) + '%';
+                  }
                   if (/cost|income|dollar|amount|price/i.test(k)) return formatMoney(v);
                   return v;
+              }
+              function formatStatLabel(k) {
+                  if (/change[_ ]?percent|percent[_ ]?change|pct[_ ]?change|change[_ ]?pct/i.test(k)) {
+                      return 'Change';
+                  }
+                  return k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
               }
               let statsHtml = '';
               if (data.renter && data.renter.statistics) {
                   statsHtml += `<div style=\"margin-bottom: 8px;\"><span style='color:#3b82f6;font-weight:600;'>Renting</span><ul style='margin:4px 0 0 16px;padding:0;'>`;
                   for (const [k, v] of Object.entries(data.renter.statistics)) {
                       let val = formatStatValue(k, v);
-                      statsHtml += `<li><span style='color:#555;'>${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</span> <span style='color:#222;font-weight:500;'>${val}</span></li>`;
+                      statsHtml += `<li><span style='color:#555;'>${formatStatLabel(k)}:</span> <span style='color:#222;font-weight:500;'>${val}</span></li>`;
                   }
                   statsHtml += `</ul></div>`;
               }
@@ -265,7 +274,7 @@
                   statsHtml += `<div style=\"margin-bottom: 8px;\"><span style='color:#ef4444;font-weight:600;'>Buying</span><ul style='margin:4px 0 0 16px;padding:0;'>`;
                   for (const [k, v] of Object.entries(data.buyer.statistics)) {
                       let val = formatStatValue(k, v);
-                      statsHtml += `<li><span style='color:#555;'>${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</span> <span style='color:#222;font-weight:500;'>${val}</span></li>`;
+                      statsHtml += `<li><span style='color:#555;'>${formatStatLabel(k)}:</span> <span style='color:#222;font-weight:500;'>${val}</span></li>`;
                   }
                   statsHtml += `</ul></div>`;
               }
@@ -338,34 +347,34 @@
 
       data.renters.forEach(d => {
           if (d.latitude && d.longitude) {
-              const popupContent = `
-                  <b>Renting</b><br>
-                  ${d.city}, ${d.state}<br><br>
-                  ${formatCostTimeline(d.cost)}
-              `;
+              // const popupContent = `
+              //     <b>Renting</b><br>
+              //     ${d.city}, ${d.state}<br><br>
+              //     ${formatCostTimeline(d.cost)}
+              // `;
               const marker = L.circleMarker([d.latitude, d.longitude], {
                   color: "blue"
               }).addTo(map);
-              marker.bindPopup(popupContent);
-              marker.on('mouseover', function() {
-                  showCityPopup(d.city);
+              // marker.bindPopup(popupContent);
+              marker.on('click', function() {
+                  showCityPopup(`${d.city}, ${d.state}`);
               });
           } // else: do nothing if no lat/lon
       });
 
       data.buyers.forEach(d => {
           if (d.latitude && d.longitude) {
-              const popupContent = `
-                  <b>Buying</b><br>
-                  ${d.city}, ${d.state}<br><br>
-                  ${formatCostTimeline(d.cost)}
-              `;
+              // const popupContent = `
+              //     <b>Buying</b><br>
+              //     ${d.city}, ${d.state}<br><br>
+              //     ${formatCostTimeline(d.cost)}
+              // `;
               const marker = L.circleMarker([d.latitude, d.longitude], {
                   color: "red"
               }).addTo(map);
-              marker.bindPopup(popupContent);
-              marker.on('mouseover', function() {
-                  showCityPopup(d.city);
+              // marker.bindPopup(popupContent);
+              marker.on('click', function() {
+                  showCityPopup(`${d.city}, ${d.state}`);
               });
           } // else: do nothing if no lat/lon
       });
