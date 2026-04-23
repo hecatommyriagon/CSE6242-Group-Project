@@ -353,7 +353,8 @@
               //     ${formatCostTimeline(d.cost)}
               // `;
               const marker = L.circleMarker([d.latitude, d.longitude], {
-                  color: "blue"
+                  color: "blue",
+                  radius: 3
               }).addTo(map);
               // marker.bindPopup(popupContent);
               marker.on('click', function() {
@@ -370,7 +371,8 @@
               //     ${formatCostTimeline(d.cost)}
               // `;
               const marker = L.circleMarker([d.latitude, d.longitude], {
-                  color: "red"
+                  color: "red",
+                  radius: 3
               }).addTo(map);
               // marker.bindPopup(popupContent);
               marker.on('click', function() {
