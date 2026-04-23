@@ -1,99 +1,385 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
+  <head>
     <title>RENT vs BUY</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
     <style>
-        #map {
-            height: 90vh;
-            width: 100%;
-        }
+      #map {
+        height: 90vh;
+        width: 100%;
+      }
+      #zori-popup {
+        resize: both;
+        overflow: auto;
+        min-width: 320px;
+        min-height: 200px;
+        cursor: move;
+      }
     </style>
-</head>
-<body>
-
-    <h1>Rent vs Buy</h1>
+  </head>
+  <body>
+    <div
+      style="
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1em;
+      "
+    >
+      <h1 style="margin: 0">Rent vs Buy</h1>
+      <div style="position: relative">
+        <input
+          id="city-search"
+          type="text"
+          placeholder="Search city..."
+          style="width: 300px; padding: 4px"
+          autocomplete="off"
+        />
+        <div
+          id="autocomplete-list"
+          style="
+            border: 1px solid #ccc;
+            max-height: 150px;
+            overflow-y: auto;
+            position: absolute;
+            background: white;
+            z-index: 1000;
+            width: 100%;
+          "
+        ></div>
+      </div>
+    </div>
     <div id="map"></div>
+
+    <div
+      id="zori-popup"
+      style="
+        display: none;
+        position: fixed;
+        left: 50%;
+        top: 20%;
+        transform: translate(-50%, 0);
+        background: #fff;
+        border-radius: 16px;
+        border: none;
+        padding: 28px 32px 24px 32px;
+        z-index: 2000;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+        min-width: 340px;
+        min-height: 220px;
+        font-family:
+          &quot;Segoe UI&quot;, &quot;Roboto&quot;, Arial, sans-serif;
+        color: #222;
+      "
+    >
+      <span
+        id="zori-close"
+        style="
+          float: right;
+          cursor: pointer;
+          font-size: 24px;
+          color: #888;
+          margin-top: -8px;
+          margin-right: -8px;
+        "
+        title="Close popup"
+        >&times;</span
+      >
+      <h2
+        id="zori-title"
+        style="margin-top: 0; font-size: 1.4em; font-weight: 600"
+      ></h2>
+      <div id="statistics" style="margin-bottom: 18px"></div>
+      <canvas
+        id="zori-chart"
+        width="500"
+        height="220"
+        style="margin-top: 8px"
+      ></canvas>
+    </div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
     <script>
-        var map = L.map('map').setView([37.8, -96], 4);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+      // Simple debug logger that can be toggled on/off with window.DEBUG_UI
+      function debugLog(...args) {
+          if (window.DEBUG_UI) console.log('[MAP DEBUG]', ...args);
+      }
+      window.DEBUG_UI = true;
 
-        function formatCostTimeline(costDict) {
-            let html = "<b>Cost Timeline:</b><br>";
+      // Draggable popup logic
+      (function() {
+          const popup = document.getElementById('zori-popup');
+          let isDragging = false, offsetX = 0, offsetY = 0;
+          popup.addEventListener('mousedown', function(e) {
+              if (e.target.id === 'zori-close') return;
+              isDragging = true;
+              offsetX = e.clientX - popup.offsetLeft;
+              offsetY = e.clientY - popup.offsetTop;
+              document.body.style.userSelect = 'none';
+          });
+          document.addEventListener('mousemove', function(e) {
+              if (isDragging) {
+                  popup.style.left = e.clientX - offsetX + 'px';
+                  popup.style.top = e.clientY - offsetY + 'px';
+                  popup.style.transform = '';
+              }
+          });
+          document.addEventListener('mouseup', function() {
+              isDragging = false;
+              document.body.style.userSelect = '';
+          });
+      })();
 
-            const dates = Object.keys(costDict).sort();
+          // Chart.js for line chart
+          const chartScript = document.createElement('script');
+          chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+          document.head.appendChild(chartScript);
 
-            dates.forEach(date => {
-                html += `${date}: $${costDict[date].toFixed(2)}<br>`;
-            });
+          // --- Autocomplete and ZORI chart logic ---
+          let cityList = [];
+          let chartInstance = null;
 
-            return html;
-        }
+          async function fetchCities() {
+                const resp = await fetch('/api/data/cities');
+              cityList = await resp.json();
+          }
 
-        function formatStatistics(statsDict) {
-            if (!statsDict) return "";
+          // Basic autocomplete function for city search input
+          function autocomplete(inp, arr) {
+              let currentFocus;
+              inp.addEventListener('input', function() {
+                  let val = this.value;
+                  closeAllLists();
+                  if (!val) return false;
+                  currentFocus = -1;
+                  const listDiv = document.getElementById('autocomplete-list');
+                  listDiv.innerHTML = '';
+                  // Only show exact 'City, ST' matches in the dropdown
+                  arr.filter(c => c.toLowerCase().includes(val.toLowerCase())).slice(0, 10).forEach(cityState => {
+                      let item = document.createElement('div');
+                      item.innerHTML = cityState;
+                      item.style.padding = '4px';
+                      item.style.cursor = 'pointer';
+                      item.onclick = function() {
+                          inp.value = cityState;
+                          closeAllLists();
+                          showCityPopup(cityState, true); // Only use showCityPopup for searchbar
+                      };
+                      listDiv.appendChild(item);
+                  });
+                  listDiv.style.display = arr.length ? 'block' : 'none';
+              });
+              inp.addEventListener('keydown', function(e) {
+                  let listDiv = document.getElementById('autocomplete-list');
+                  let items = listDiv.getElementsByTagName('div');
+                  if (e.keyCode == 40) { // down
+                      currentFocus++;
+                      addActive(items);
+                  } else if (e.keyCode == 38) { // up
+                      currentFocus--;
+                      addActive(items);
+                  } else if (e.keyCode == 13) { // enter
+                      e.preventDefault();
+                      if (currentFocus > -1 && items[currentFocus]) {
+                          items[currentFocus].click();
+                      }
+                  }
+              });
+              function addActive(items) {
+                  if (!items) return false;
+                  removeActive(items);
+                  if (currentFocus >= items.length) currentFocus = 0;
+                  if (currentFocus < 0) currentFocus = items.length - 1;
+                  items[currentFocus].classList.add('autocomplete-active');
+              }
+              function removeActive(items) {
+                  for (let i = 0; i < items.length; i++) {
+                      items[i].classList.remove('autocomplete-active');
+                  }
+              }
+              function closeAllLists() {
+                  document.getElementById('autocomplete-list').innerHTML = '';
+                  document.getElementById('autocomplete-list').style.display = 'none';
+              }
+              document.addEventListener('click', function (e) {
+                  if (e.target != inp) closeAllLists();
+              });
+          }
 
-            let html = "<br><b>Statistics:</b><br>";
+          async function showCityPopup(city, panTo = false) {
+              // Wait for Chart.js to load
+              if (!window.Chart) {
+                  await new Promise(res => chartScript.onload = res);
+              }
+              const resp = await fetch(`/api/data/${encodeURIComponent(city)}`);
+              if (!resp.ok) {
+                  alert('No data for city');
+                  return;
+              }
+              const data = await resp.json();
+              // Use renter and buyer cost timelines if available
+              let dates = [];
+              let rentVals = [];
+              let buyVals = [];
+              if (data.renter && data.renter.cost) {
+                  try {
+                      const costObj = typeof data.renter.cost === 'string' ? JSON.parse(data.renter.cost) : data.renter.cost;
+                      dates = Object.keys(costObj);
+                      rentVals = Object.values(costObj);
+                  } catch {}
+              }
+              if (data.buyer && data.buyer.cost) {
+                  try {
+                      const costObj = typeof data.buyer.cost === 'string' ? JSON.parse(data.buyer.cost) : data.buyer.cost;
+                      if (dates.length === 0) dates = Object.keys(costObj);
+                      buyVals = Object.values(costObj);
+                  } catch {}
+              }
+              document.getElementById('zori-title').textContent = city + ' — Rent vs Buy';
+              document.getElementById('zori-popup').style.display = 'block';
+              // Show statistics with human labels and modern look
+              function formatMoney(val) {
+                  if (typeof val !== 'number') val = Number(val);
+                  if (isNaN(val)) return val;
+                  return '$' + val.toLocaleString(undefined, { maximumFractionDigits: 0 });
+              }
+              function formatStatValue(k, v) {
+                  if (typeof v !== 'number') return v;
+                  if (/change[_ ]?percent|percent[_ ]?change|pct[_ ]?change|change[_ ]?pct/i.test(k)) {
+                      return v.toFixed(1) + '%';
+                  }
+                  if (/cost|income|dollar|amount|price/i.test(k)) return formatMoney(v);
+                  return v;
+              }
+              function formatStatLabel(k) {
+                  if (/change[_ ]?percent|percent[_ ]?change|pct[_ ]?change|change[_ ]?pct/i.test(k)) {
+                      return 'Change';
+                  }
+                  return k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              }
+              let statsHtml = '';
+              if (data.renter && data.renter.statistics) {
+                  statsHtml += `<div style=\"margin-bottom: 8px;\"><span style='color:#3b82f6;font-weight:600;'>Renting</span><ul style='margin:4px 0 0 16px;padding:0;'>`;
+                  for (const [k, v] of Object.entries(data.renter.statistics)) {
+                      let val = formatStatValue(k, v);
+                      statsHtml += `<li><span style='color:#555;'>${formatStatLabel(k)}:</span> <span style='color:#222;font-weight:500;'>${val}</span></li>`;
+                  }
+                  statsHtml += `</ul></div>`;
+              }
+              if (data.buyer && data.buyer.statistics) {
+                  statsHtml += `<div style=\"margin-bottom: 8px;\"><span style='color:#ef4444;font-weight:600;'>Buying</span><ul style='margin:4px 0 0 16px;padding:0;'>`;
+                  for (const [k, v] of Object.entries(data.buyer.statistics)) {
+                      let val = formatStatValue(k, v);
+                      statsHtml += `<li><span style='color:#555;'>${formatStatLabel(k)}:</span> <span style='color:#222;font-weight:500;'>${val}</span></li>`;
+                  }
+                  statsHtml += `</ul></div>`;
+              }
+              document.getElementById('statistics').innerHTML = statsHtml;
+              if (chartInstance) chartInstance.destroy();
+              const ctx = document.getElementById('zori-chart').getContext('2d');
+              chartInstance = new Chart(ctx, {
+                  type: 'line',
+                  data: {
+                      labels: dates,
+                      datasets: [
+                          {
+                              label: 'Rent',
+                              data: rentVals,
+                              borderColor: '#3b82f6',
+                              backgroundColor: 'rgba(59,130,246,0.08)',
+                              fill: false,
+                              pointRadius: 0
+                          },
+                          {
+                              label: 'Buy',
+                              data: buyVals,
+                              borderColor: '#ef4444',
+                              backgroundColor: 'rgba(239,68,68,0.08)',
+                              fill: false,
+                              pointRadius: 0
+                          }
+                      ]
+                  },
+                  options: {
+                      interaction: { mode: 'index', intersect: false },
+                      plugins: { legend: { display: true } },
+                      responsive: false,
+                      scales: {
+                          x: { title: { display: true, text: 'Date' }, ticks: { maxTicksLimit: 10 } },
+                          y: { title: { display: true, text: 'Cost ($)' } }
+                      }
+                  }
+              });
+          }
 
-            Object.keys(statsDict).forEach(key => {
-                html += `<b>${key}</b> ${statsDict[key]}<br>`;
-            });
+          document.getElementById('zori-close').onclick = function() {
+              document.getElementById('zori-popup').style.display = 'none';
+          };
 
-            return html;
-        }
+          // Initialize autocomplete after fetching cities
+          fetchCities().then(() => {
+              const inp = document.getElementById('city-search');
+              autocomplete(inp, cityList);
+          });
+      var map = L.map('map').setView([37.8, -96], 4);
 
-        const data = {{ data | tojson }};
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
 
-        data.renters.forEach(d => {
-            if (d.latitude && d.longitude) {
-                const popupContent = `
-                    <b>Renting</b><br>
-                    ${d.city}, ${d.state}<br><br>
-                    ${formatCostTimeline(d.cost)}
-                    ${formatStatistics(d.statistics)}
-                `;
+      function formatCostTimeline(costDict) {
+          let html = "<b>Cost Timeline:</b><br>";
 
-                L.circleMarker([d.latitude, d.longitude], {
-                    color: "blue",
-                    radius: 4
-                })
-                .addTo(map)
-                .bindPopup(popupContent);
-            }
-            else {
-                console.log("Could not make marker for: ", d)
-            }
-        });
+          const dates = Object.keys(costDict).sort();
 
-        data.buyers.forEach(d => {
-            if (d.latitude && d.longitude) {
-                const popupContent = `
-                    <b>Buying</b><br>
-                    ${d.city}, ${d.state}<br><br>
-                    ${formatCostTimeline(d.cost)}
-                    ${formatStatistics(d.statistics)}
-                `;
+          dates.forEach(date => {
+              html += `${date}: $${costDict[date].toFixed(2)}<br>`;
+          });
 
-                L.circleMarker([d.latitude, d.longitude], {
-                    color: "red",
-                    radius: 4
-                })
-                .addTo(map)
-                .bindPopup(popupContent);
-            }
-            else {
-                console.log("Could not make marker for: ", d)
-            }
-        });
+          return html;
+      }
+
+      var data = {{ data | tojson }};
+
+      data.renters.forEach(d => {
+          if (d.latitude && d.longitude) {
+              // const popupContent = `
+              //     <b>Renting</b><br>
+              //     ${d.city}, ${d.state}<br><br>
+              //     ${formatCostTimeline(d.cost)}
+              // `;
+              const marker = L.circleMarker([d.latitude, d.longitude], {
+                  color: "blue",
+                  radius: 3
+              }).addTo(map);
+              // marker.bindPopup(popupContent);
+              marker.on('click', function() {
+                  showCityPopup(`${d.city}, ${d.state}`);
+              });
+          } // else: do nothing if no lat/lon
+      });
+
+      data.buyers.forEach(d => {
+          if (d.latitude && d.longitude) {
+              // const popupContent = `
+              //     <b>Buying</b><br>
+              //     ${d.city}, ${d.state}<br><br>
+              //     ${formatCostTimeline(d.cost)}
+              // `;
+              const marker = L.circleMarker([d.latitude, d.longitude], {
+                  color: "red",
+                  radius: 3
+              }).addTo(map);
+              // marker.bindPopup(popupContent);
+              marker.on('click', function() {
+                  showCityPopup(`${d.city}, ${d.state}`);
+              });
+          } // else: do nothing if no lat/lon
+      });
     </script>
-
-</body>
+  </body>
 </html>

@@ -214,3 +214,5 @@ resources/.DS_Store
 
 resources/properties_2016.csv
 data/processed/properties_2016_cleaned.csv
+data/.DS_Store
+.DS_Store
