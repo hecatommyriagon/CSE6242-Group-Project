@@ -143,6 +143,23 @@
           let cityList = [];
           let chartInstance = null;
 
+          function parseMaybeJson(value) {
+        if (!value) return {};
+
+        if (typeof value === 'object') return value;
+
+        if (typeof value === 'string') {
+            try {
+            return JSON.parse(value);
+            } catch {
+            console.warn('Could not parse statistics:', value);
+            return {};
+            }
+        }
+
+        return {};
+        }
+
           async function fetchCities() {
                 const resp = await fetch('/api/data/cities');
               cityList = await resp.json();
@@ -263,20 +280,28 @@
               }
               let statsHtml = '';
               if (data.renter && data.renter.statistics) {
-                  statsHtml += `<div style=\"margin-bottom: 8px;\"><span style='color:#3b82f6;font-weight:600;'>Renting</span><ul style='margin:4px 0 0 16px;padding:0;'>`;
-                  for (const [k, v] of Object.entries(data.renter.statistics)) {
-                      let val = formatStatValue(k, v);
-                      statsHtml += `<li><span style='color:#555;'>${formatStatLabel(k)}:</span> <span style='color:#222;font-weight:500;'>${val}</span></li>`;
-                  }
-                  statsHtml += `</ul></div>`;
+                const renterStats = parseMaybeJson(data.renter.statistics);
+
+                statsHtml += `<div style=\"margin-bottom: 8px;\"><span style='color:#3b82f6;font-weight:600;'>Renting</span><ul style='margin:4px 0 0 16px;padding:0;'>`;
+
+                for (const [k, v] of Object.entries(renterStats)) {
+                    let val = formatStatValue(k, v);
+                    statsHtml += `<li><span style='color:#555;'>${formatStatLabel(k)}:</span> <span style='color:#222;font-weight:500;'>${val}</span></li>`;
+                }
+
+                statsHtml += `</ul></div>`;
               }
               if (data.buyer && data.buyer.statistics) {
-                  statsHtml += `<div style=\"margin-bottom: 8px;\"><span style='color:#ef4444;font-weight:600;'>Buying</span><ul style='margin:4px 0 0 16px;padding:0;'>`;
-                  for (const [k, v] of Object.entries(data.buyer.statistics)) {
-                      let val = formatStatValue(k, v);
-                      statsHtml += `<li><span style='color:#555;'>${formatStatLabel(k)}:</span> <span style='color:#222;font-weight:500;'>${val}</span></li>`;
-                  }
-                  statsHtml += `</ul></div>`;
+                const buyerStats = parseMaybeJson(data.buyer.statistics);
+
+                statsHtml += `<div style=\"margin-bottom: 8px;\"><span style='color:#ef4444;font-weight:600;'>Buying</span><ul style='margin:4px 0 0 16px;padding:0;'>`;
+
+                for (const [k, v] of Object.entries(buyerStats)) {
+                    let val = formatStatValue(k, v);
+                    statsHtml += `<li><span style='color:#555;'>${formatStatLabel(k)}:</span> <span style='color:#222;font-weight:500;'>${val}</span></li>`;
+                }
+
+                statsHtml += `</ul></div>`;
               }
               document.getElementById('statistics').innerHTML = statsHtml;
               if (chartInstance) chartInstance.destroy();
