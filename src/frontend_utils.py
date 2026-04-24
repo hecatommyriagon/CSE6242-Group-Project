@@ -8,7 +8,7 @@ import logging
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError, GeocoderUnavailable
 
-CACHE_FILE = "src/data/lat_lon_cache.json"
+CACHE_FILE = "src/data/lat_lon_cache_COMMON.json"
 MAX_TRIES_GEOCODING = 2
 
 

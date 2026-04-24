@@ -345,40 +345,34 @@
 
       var data = {{ data | tojson }};
 
-      data.renters.forEach(d => {
+      // Merge renters and buyers by city/state
+      var cityMap = {};
+      data.renters.forEach(function(d) {
           if (d.latitude && d.longitude) {
-              // const popupContent = `
-              //     <b>Renting</b><br>
-              //     ${d.city}, ${d.state}<br><br>
-              //     ${formatCostTimeline(d.cost)}
-              // `;
-              const marker = L.circleMarker([d.latitude, d.longitude], {
-                  color: "blue",
-                  radius: 3
-              }).addTo(map);
-              // marker.bindPopup(popupContent);
-              marker.on('click', function() {
-                  showCityPopup(`${d.city}, ${d.state}`);
-              });
-          } // else: do nothing if no lat/lon
+              var key = d.city + ', ' + d.state;
+              cityMap[key] = cityMap[key] || { city: d.city, state: d.state, latitude: d.latitude, longitude: d.longitude };
+              cityMap[key].renter = d;
+          }
+      });
+      data.buyers.forEach(function(d) {
+          if (d.latitude && d.longitude) {
+              var key = d.city + ', ' + d.state;
+              cityMap[key] = cityMap[key] || { city: d.city, state: d.state, latitude: d.latitude, longitude: d.longitude };
+              cityMap[key].buyer = d;
+          }
       });
 
-      data.buyers.forEach(d => {
+      // Add one marker per city
+      Object.values(cityMap).forEach(function(d) {
           if (d.latitude && d.longitude) {
-              // const popupContent = `
-              //     <b>Buying</b><br>
-              //     ${d.city}, ${d.state}<br><br>
-              //     ${formatCostTimeline(d.cost)}
-              // `;
               const marker = L.circleMarker([d.latitude, d.longitude], {
-                  color: "red",
-                  radius: 3
+                  color: '#6366f1',
+                  radius: 4
               }).addTo(map);
-              // marker.bindPopup(popupContent);
               marker.on('click', function() {
                   showCityPopup(`${d.city}, ${d.state}`);
               });
-          } // else: do nothing if no lat/lon
+          }
       });
     </script>
   </body>

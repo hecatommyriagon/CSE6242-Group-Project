@@ -6,8 +6,8 @@ from flask import Blueprint, jsonify, request
 # Blueprint for new data API
 data_api = Blueprint("data_api", __name__)
 
-RENTALS_CSV = os.path.join("data", "processed", "rentals.csv")
-HOUSING_CSV = os.path.join("data", "processed", "housing.csv")
+RENTALS_CSV = os.path.join("data", "processed", "rentals_common.csv")
+HOUSING_CSV = os.path.join("data", "processed", "housing_common.csv")
 
 
 def parse_json_field(val):
