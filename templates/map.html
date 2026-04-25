@@ -29,30 +29,51 @@
       "
     >
       <h1 style="margin: 0">Rent vs Buy</h1>
-      <div style="position: relative">
-        <input
-          id="city-search"
-          type="text"
-          placeholder="Search city..."
-          style="width: 300px; padding: 4px"
-          autocomplete="off"
-        />
-        <div
-          id="autocomplete-list"
+      <div style="display: flex; align-items: center; gap: 16px">
+        <div style="position: relative">
+          <input
+            id="city-search"
+            type="text"
+            placeholder="Search city..."
+            style="width: 300px; padding: 4px"
+            autocomplete="off"
+          />
+          <div
+            id="autocomplete-list"
+            style="
+              border: 1px solid #ccc;
+              max-height: 150px;
+              overflow-y: auto;
+              position: absolute;
+              background: white;
+              z-index: 1000;
+              width: 100%;
+            "
+          ></div>
+        </div>
+        <button
+          id="navbar-compare-btn"
           style="
-            border: 1px solid #ccc;
-            max-height: 150px;
-            overflow-y: auto;
-            position: absolute;
-            background: white;
-            z-index: 1000;
-            width: 100%;
+            margin-left: 10px;
+            margin-right: 10px;
+            padding: 6px 16px;
+            background: #6366f1;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 1em;
+            cursor: pointer;
           "
-        ></div>
+        >
+          Compare Cities
+        </button>
       </div>
     </div>
+
     <div id="map"></div>
 
+    <!-- Existing ZORI popup -->
     <div
       id="zori-popup"
       style="
@@ -100,6 +121,423 @@
       ></canvas>
     </div>
 
+    <!-- Compare Cities Popup -->
+    <div
+      id="compare-popup"
+      style="
+        display: none;
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        background: #fff;
+        border-radius: 16px;
+        border: none;
+        padding: 32px 48px 32px 48px;
+        z-index: 2100;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+        min-width: 1100px;
+        min-height: 700px;
+        font-family:
+          &quot;Segoe UI&quot;, &quot;Roboto&quot;, Arial, sans-serif;
+        color: #222;
+      "
+    >
+      <span
+        id="compare-close"
+        style="
+          float: right;
+          cursor: pointer;
+          font-size: 24px;
+          color: #888;
+          margin-top: -8px;
+          margin-right: -8px;
+        "
+        title="Close popup"
+        >&times;</span
+      >
+      <h2
+        style="
+          margin-top: 0;
+          font-size: 1.4em;
+          font-weight: 600;
+          text-align: center;
+        "
+      >
+        Compare Cities
+      </h2>
+      <div
+        style="
+          display: flex;
+          gap: 24px;
+          justify-content: center;
+          margin-bottom: 18px;
+        "
+      >
+        <div style="flex: 1">
+          <input
+            id="compare-city1"
+            type="text"
+            placeholder="Select City 1..."
+            style="width: 95%; padding: 4px"
+            autocomplete="off"
+          />
+          <div
+            id="compare-autocomplete1"
+            style="
+              border: 1px solid #ccc;
+              max-height: 120px;
+              overflow-y: auto;
+              position: absolute;
+              background: white;
+              z-index: 2200;
+              width: 300px;
+            "
+          ></div>
+        </div>
+        <div style="flex: 1">
+          <input
+            id="compare-city2"
+            type="text"
+            placeholder="Select City 2..."
+            style="width: 95%; padding: 4px"
+            autocomplete="off"
+          />
+          <div
+            id="compare-autocomplete2"
+            style="
+              border: 1px solid #ccc;
+              max-height: 120px;
+              overflow-y: auto;
+              position: absolute;
+              background: white;
+              z-index: 2200;
+              width: 300px;
+            "
+          ></div>
+        </div>
+      </div>
+      <div
+        id="compare-content"
+        style="display: flex; gap: 32px; justify-content: center"
+      ></div>
+    </div>
+
+    <script>
+      // --- Shared cityList and fetchCities for all features ---
+      let cityList = [];
+      async function fetchCities() {
+        const resp = await fetch("/api/data/cities");
+        cityList = await resp.json();
+      }
+      function showComparePopup() {
+        document.getElementById("compare-popup").style.display = "block";
+      }
+      document.getElementById("compare-close").onclick = function () {
+        document.getElementById("compare-popup").style.display = "none";
+      };
+      // Helper for autocomplete for compare popup
+      function compareAutocomplete(inp, arr, listDivId, onSelect) {
+        let currentFocus;
+        inp.addEventListener("input", function () {
+          let val = this.value;
+          document.getElementById(listDivId).innerHTML = "";
+          if (!val) return false;
+          currentFocus = -1;
+          arr
+            .filter((c) => c.toLowerCase().includes(val.toLowerCase()))
+            .slice(0, 10)
+            .forEach((cityState) => {
+              let item = document.createElement("div");
+              item.innerHTML = cityState;
+              item.style.padding = "4px";
+              item.style.cursor = "pointer";
+              item.onclick = function () {
+                inp.value = cityState;
+                document.getElementById(listDivId).innerHTML = "";
+                onSelect(cityState);
+              };
+              document.getElementById(listDivId).appendChild(item);
+            });
+          document.getElementById(listDivId).style.display = arr.length
+            ? "block"
+            : "none";
+        });
+        inp.addEventListener("keydown", function (e) {
+          let listDiv = document.getElementById(listDivId);
+          let items = listDiv.getElementsByTagName("div");
+          if (e.keyCode == 40) {
+            currentFocus++;
+            addActive(items);
+          } else if (e.keyCode == 38) {
+            currentFocus--;
+            addActive(items);
+          } else if (e.keyCode == 13) {
+            e.preventDefault();
+            if (currentFocus > -1 && items[currentFocus]) {
+              items[currentFocus].click();
+            }
+          }
+        });
+        function addActive(items) {
+          if (!items) return false;
+          removeActive(items);
+          if (currentFocus >= items.length) currentFocus = 0;
+          if (currentFocus < 0) currentFocus = items.length - 1;
+          items[currentFocus].classList.add("autocomplete-active");
+        }
+        function removeActive(items) {
+          for (let i = 0; i < items.length; i++) {
+            items[i].classList.remove("autocomplete-active");
+          }
+        }
+        document.addEventListener("click", function (e) {
+          if (e.target != inp)
+            document.getElementById(listDivId).innerHTML = "";
+        });
+      }
+      // Render side-by-side city data
+      // --- Compare Cities: show data after each city is selected, and show charts ---
+      let compareChart1 = null;
+      let compareChart2 = null;
+      async function renderCompareContent(city1, city2) {
+        // Fetch data for each city if selected
+        let data1 = null,
+          data2 = null;
+        if (city1) {
+          const resp1 = await fetch(`/api/data/${encodeURIComponent(city1)}`);
+          data1 = resp1.ok ? await resp1.json() : null;
+        }
+        if (city2) {
+          const resp2 = await fetch(`/api/data/${encodeURIComponent(city2)}`);
+          data2 = resp2.ok ? await resp2.json() : null;
+        }
+        // Formatting helpers (same as single city popup)
+        function formatMoney(val) {
+          if (typeof val !== "number") val = Number(val);
+          if (isNaN(val)) return val;
+          return (
+            "$" + val.toLocaleString(undefined, { maximumFractionDigits: 0 })
+          );
+        }
+        function formatStatValue(k, v) {
+          if (typeof v !== "number") return v;
+          if (
+            /change[_ ]?percent|percent[_ ]?change|pct[_ ]?change|change[_ ]?pct/i.test(
+              k,
+            )
+          ) {
+            return v.toFixed(1) + "%";
+          }
+          if (/cost|income|dollar|amount|price/i.test(k)) return formatMoney(v);
+          return v;
+        }
+        function formatStatLabel(k) {
+          if (
+            /change[_ ]?percent|percent[_ ]?change|pct[_ ]?change|change[_ ]?pct/i.test(
+              k,
+            )
+          ) {
+            return "Change";
+          }
+          return k.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+        }
+        function statBlock(data, cityLabel, chartId) {
+          if (!data)
+            return `<div style='color:#888;text-align:center;font-size:1.2em;'>No data</div>`;
+          let html = `<div style='font-weight:700;font-size:1.35em;margin-bottom:10px;text-align:center;'>${cityLabel}</div>`;
+          html += `<div style='margin-bottom:14px;'><span style='color:#3b82f6;font-weight:700;font-size:1.13em;'>Renting</span><ul style='margin:6px 0 0 20px;padding:0;font-size:1.13em;'>`;
+          if (data.renter && data.renter.statistics) {
+            for (const [k, v] of Object.entries(data.renter.statistics)) {
+              let val = formatStatValue(k, v);
+              html += `<li style='margin-bottom:2px;'><span style='color:#555;'>${formatStatLabel(k)}:</span> <span style='color:#222;font-weight:600;'>${val}</span></li>`;
+            }
+          } else {
+            html += `<li style='color:#aaa;'>No renting data</li>`;
+          }
+          html += `</ul></div>`;
+          html += `<div style='margin-bottom:14px;'><span style='color:#ef4444;font-weight:700;font-size:1.13em;'>Buying</span><ul style='margin:6px 0 0 20px;padding:0;font-size:1.13em;'>`;
+          if (data.buyer && data.buyer.statistics) {
+            for (const [k, v] of Object.entries(data.buyer.statistics)) {
+              let val = formatStatValue(k, v);
+              html += `<li style='margin-bottom:2px;'><span style='color:#555;'>${formatStatLabel(k)}:</span> <span style='color:#222;font-weight:600;'>${val}</span></li>`;
+            }
+          } else {
+            html += `<li style='color:#aaa;'>No buying data</li>`;
+          }
+          html += `</ul></div>`;
+          html += `<div style='margin-top:18px;'><canvas id='${chartId}' width='520' height='260'></canvas></div>`;
+          return html;
+        }
+        document.getElementById("compare-content").innerHTML = `
+          <div style='flex:1; border-right:1px solid #eee; padding:0 32px 0 0;'>${city1 ? statBlock(data1, city1, "compare-chart1") : ""}</div>
+          <div style='flex:1; padding:0 0 0 32px;'>${city2 ? statBlock(data2, city2, "compare-chart2") : ""}</div>
+        `;
+        // Draw charts for each city if data exists
+        if (city1 && data1 && document.getElementById("compare-chart1")) {
+          let dates = [],
+            rentVals = [],
+            buyVals = [];
+          if (data1.renter && data1.renter.cost) {
+            try {
+              const costObj =
+                typeof data1.renter.cost === "string"
+                  ? JSON.parse(data1.renter.cost)
+                  : data1.renter.cost;
+              dates = Object.keys(costObj);
+              rentVals = Object.values(costObj);
+            } catch {}
+          }
+          if (data1.buyer && data1.buyer.cost) {
+            try {
+              const costObj =
+                typeof data1.buyer.cost === "string"
+                  ? JSON.parse(data1.buyer.cost)
+                  : data1.buyer.cost;
+              if (dates.length === 0) dates = Object.keys(costObj);
+              buyVals = Object.values(costObj);
+            } catch {}
+          }
+          if (compareChart1) compareChart1.destroy();
+          compareChart1 = new Chart(
+            document.getElementById("compare-chart1").getContext("2d"),
+            {
+              type: "line",
+              data: {
+                labels: dates,
+                datasets: [
+                  {
+                    label: "Rent",
+                    data: rentVals,
+                    borderColor: "#3b82f6",
+                    backgroundColor: "rgba(59,130,246,0.08)",
+                    fill: false,
+                    pointRadius: 0,
+                  },
+                  {
+                    label: "Buy",
+                    data: buyVals,
+                    borderColor: "#ef4444",
+                    backgroundColor: "rgba(239,68,68,0.08)",
+                    fill: false,
+                    pointRadius: 0,
+                  },
+                ],
+              },
+              options: {
+                interaction: { mode: "index", intersect: false },
+                plugins: { legend: { display: true } },
+                responsive: false,
+                scales: {
+                  x: {
+                    title: { display: true, text: "Date" },
+                    ticks: { maxTicksLimit: 10 },
+                  },
+                  y: { title: { display: true, text: "Cost ($)" } },
+                },
+              },
+            },
+          );
+        }
+        if (city2 && data2 && document.getElementById("compare-chart2")) {
+          let dates = [],
+            rentVals = [],
+            buyVals = [];
+          if (data2.renter && data2.renter.cost) {
+            try {
+              const costObj =
+                typeof data2.renter.cost === "string"
+                  ? JSON.parse(data2.renter.cost)
+                  : data2.renter.cost;
+              dates = Object.keys(costObj);
+              rentVals = Object.values(costObj);
+            } catch {}
+          }
+          if (data2.buyer && data2.buyer.cost) {
+            try {
+              const costObj =
+                typeof data2.buyer.cost === "string"
+                  ? JSON.parse(data2.buyer.cost)
+                  : data2.buyer.cost;
+              if (dates.length === 0) dates = Object.keys(costObj);
+              buyVals = Object.values(costObj);
+            } catch {}
+          }
+          if (compareChart2) compareChart2.destroy();
+          compareChart2 = new Chart(
+            document.getElementById("compare-chart2").getContext("2d"),
+            {
+              type: "line",
+              data: {
+                labels: dates,
+                datasets: [
+                  {
+                    label: "Rent",
+                    data: rentVals,
+                    borderColor: "#3b82f6",
+                    backgroundColor: "rgba(59,130,246,0.08)",
+                    fill: false,
+                    pointRadius: 0,
+                  },
+                  {
+                    label: "Buy",
+                    data: buyVals,
+                    borderColor: "#ef4444",
+                    backgroundColor: "rgba(239,68,68,0.08)",
+                    fill: false,
+                    pointRadius: 0,
+                  },
+                ],
+              },
+              options: {
+                interaction: { mode: "index", intersect: false },
+                plugins: { legend: { display: true } },
+                responsive: false,
+                scales: {
+                  x: {
+                    title: { display: true, text: "Date" },
+                    ticks: { maxTicksLimit: 10 },
+                  },
+                  y: { title: { display: true, text: "Cost ($)" } },
+                },
+              },
+            },
+          );
+        }
+      }
+      // Setup compare popup after fetching cities
+      fetchCities().then(() => {
+        const inp1 = document.getElementById("compare-city1");
+        const inp2 = document.getElementById("compare-city2");
+        let city1 = "",
+          city2 = "";
+        compareAutocomplete(
+          inp1,
+          cityList,
+          "compare-autocomplete1",
+          function (val) {
+            city1 = val;
+            renderCompareContent(city1, city2);
+          },
+        );
+        compareAutocomplete(
+          inp2,
+          cityList,
+          "compare-autocomplete2",
+          function (val) {
+            city2 = val;
+            renderCompareContent(city1, city2);
+          },
+        );
+      });
+      // Add navbar button event after DOM is loaded
+      window.addEventListener("DOMContentLoaded", function () {
+        document.getElementById("navbar-compare-btn").onclick = function () {
+          showComparePopup();
+        };
+      });
+    </script>
+
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
     <script>
@@ -140,13 +578,7 @@
           document.head.appendChild(chartScript);
 
           // --- Autocomplete and ZORI chart logic ---
-          let cityList = [];
           let chartInstance = null;
-
-          async function fetchCities() {
-                const resp = await fetch('/api/data/cities');
-              cityList = await resp.json();
-          }
 
           // Basic autocomplete function for city search input
           function autocomplete(inp, arr) {
